@@ -225,3 +225,11 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
 #copyBtn, #connectBtn { width: 100%; margin-top: 10px; }
 #copyBtn { background-color: #333; color: #ccc; }
 #connectBtn { background-color: var(--accent-green); color: #111; }
+
+.piece {
+    cursor: grab;
+}
+
+.piece.dragging {
+    opacity: 0; 
+}

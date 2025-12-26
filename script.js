@@ -357,7 +357,32 @@ function promoteChoice() {
     return ["q", "r", "b", "n"].includes(c) ? c : "q";
 }
 
-// --- RENDERING ---
+function handleDragStart(e, pieceType, color, r, c) {
+    if (globals.turn !== globals.myColor || globals.turn !== color) {
+        e.preventDefault();
+        return;
+    }
+    globals.selected = null; 
+    onPieceClick(pieceType, color, r, c); 
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", JSON.stringify({ r, c }));
+    setTimeout(() => {
+        e.target.classList.add('dragging');
+    }, 0);
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+}
+
+function handleDrop(e, r, c) {
+    e.preventDefault();
+    if (globals.selected) {
+        tryMove(r, c);
+    }
+}
+
+// RENDERING
 function initializeBoard() {
     const boardEl = document.getElementById("board");
     boardEl.innerHTML = "";
@@ -367,6 +392,11 @@ function initializeBoard() {
             const square = document.createElement("div");
             square.className = "square " + ((viewRow + viewCol) % 2 === 0 ? "light" : "dark");
             square.addEventListener("click", () => onSquareClick(r, c));
+            square.addEventListener("dragover", (e) => {
+                e.preventDefault(); 
+                e.dataTransfer.dropEffect = "move";
+            });
+            square.addEventListener("drop", (e) => handleDrop(e, r, c));
             if (globals.boardState[r][c]) {
                 square.appendChild(createPieceImg(globals.boardState[r][c], r, c));
             }
@@ -397,12 +427,14 @@ function createPieceImg(pieceChar, r, c) {
     const isWhitePiece = isUpper(pieceChar);
     const img = document.createElement("img");
     img.classList.add("piece");
-    img.draggable = false;
+    img.draggable = true; 
     img.src = `pieces/${pieceName[pieceType]}-${isWhitePiece ? "w" : "b"}.svg`;
-    img.addEventListener("click", (e) => {
+        img.addEventListener("click", (e) => {
         e.stopPropagation();
         onPieceClick(pieceType, isWhitePiece, r, c);
     });
+    img.addEventListener("dragstart", (e) => handleDragStart(e, pieceType, isWhitePiece, r, c));
+    img.addEventListener("dragend", handleDragEnd);
     return img;
 }
 
