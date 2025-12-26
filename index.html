@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Online</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+</head>
+<body>
+    
+    <h1>Chess Online</h1>
+
+    <div class="game-wrap" id="game-wrap" style="display:none;">
+        <div id="board"></div>
+
+        <div class="side-panel">
+            <div id="turn-indicator">Waiting...</div>
+            
+            <div class="controls">
+                <button id="drawBtn" type="button">Offer Draw</button>
+                <button id="resignBtn" type="button">Resign</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="connection-panel">
+        <div class="connection-box">
+            <h2 id="role-title">Multiplayer Setup</h2>
+            <div id="status-msg" style="color: #ff5252; margin-bottom: 15px; font-weight: bold;">Initializing...</div>
+            
+            <div class="code-area">
+                <label>1. YOUR CODE (Send this to opponent):</label>
+                <textarea id="outgoing" readonly placeholder="Generating code..."></textarea>
+                <button id="copyBtn" disabled>Copy Code</button>
+            </div>
+
+            <div class="code-area">
+                <label>2. OPPONENT'S CODE (Paste here):</label>
+                <textarea id="incoming" placeholder="Paste their code here..."></textarea>
+                <button id="connectBtn">Connect</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
