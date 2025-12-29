@@ -1,48 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Chess Online</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Chess Online</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- SimplePeer must load before script.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
 </head>
+
 <body>
-    
-    <h1>Chess Online</h1>
+  <h1>Chess Online</h1>
 
-    <div class="game-wrap" id="game-wrap" style="display:none;">
-        <div id="board"></div>
+  <div class="game-wrap" id="game-wrap" style="display:none;">
+    <div id="board"></div>
 
-        <div class="side-panel">
-            <div id="turn-indicator">Waiting...</div>
-            
-            <div class="controls">
-                <button id="drawBtn" type="button">Offer Draw</button>
-                <button id="resignBtn" type="button">Resign</button>
-            </div>
-        </div>
+    <div class="side-panel">
+      <div id="turn-indicator">Waiting...</div>
+
+      <div class="controls">
+        <button id="drawBtn" type="button">Offer Draw</button>
+        <button id="resignBtn" type="button">Resign</button>
+      </div>
     </div>
+  </div>
 
-    <div id="connection-panel">
-        <div class="connection-box">
-            <h2 id="role-title">Multiplayer Setup</h2>
-            <div id="status-msg" style="color: #ff5252; margin-bottom: 15px; font-weight: bold;">Initializing...</div>
-            
-            <div class="code-area">
-                <label>1. YOUR CODE (Send this to opponent):</label>
-                <textarea id="outgoing" readonly placeholder="Generating code..."></textarea>
-                <button id="copyBtn" disabled>Copy Code</button>
-            </div>
+  <div id="connection-panel">
+    <div class="connection-box">
+      <h2 id="role-title">Multiplayer Setup</h2>
+      <div id="status-msg" style="color:#ff5252; margin-bottom:15px; font-weight:bold;">
+        Initializing...
+      </div>
 
-            <div class="code-area">
-                <label>2. OPPONENT'S CODE (Paste here):</label>
-                <textarea id="incoming" placeholder="Paste their code here..."></textarea>
-                <button id="connectBtn">Connect</button>
-            </div>
+      <!-- HOST VIEW (only shown when URL ends with #1) -->
+      <div id="host-panel" style="display:none;">
+        <div class="code-area">
+          <label>Play as:</label>
+          <div style="display:flex; gap:14px; margin:8px 0 12px 0;">
+            <label style="display:flex; align-items:center; gap:6px;">
+              <input type="radio" name="hostColor" value="white" checked>
+              White
+            </label>
+            <label style="display:flex; align-items:center; gap:6px;">
+              <input type="radio" name="hostColor" value="black">
+              Black
+            </label>
+          </div>
         </div>
-    </div>
 
-    <script src="script.js"></script>
+        <div class="code-area">
+          <label>ROOM CODE (Send this to opponent):</label>
+          <textarea id="outgoing" readonly placeholder="Generating code..."></textarea>
+          <button id="copyBtn" disabled>Copy Code</button>
+        </div>
+      </div>
+
+      <!-- GUEST VIEW (shown when URL does NOT end with #1) -->
+      <div id="guest-panel" style="display:none;">
+        <div class="code-area">
+          <label>ENTER ROOM CODE:</label>
+          <textarea id="incoming" placeholder="Enter the 6-digit code..."></textarea>
+          <button id="connectBtn">Connect</button>
+        </div>
+
+        <div style="margin-top:10px; font-size:0.95rem; opacity:0.9;">
+          Ask the host for the 6-digit room code.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Your code -->
+  <script src="script.js"></script>
 </body>
 </html>

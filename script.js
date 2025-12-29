@@ -8,131 +8,294 @@ const globals = {
     castle: { wK: true, wQ: true, bK: true, bQ: true },
     repetition: new Map(),
     halfMoveClock: 0,
-    
     // Network
-    isHost: false, 
-    myColor: true, 
+    isHost: false,
+    myColor: true,
     peer: null,
-    connected: false
+    connected: false,
+
+    roomCode: null,
+    _sentOffer: false,
+    _sentAnswer: false
 };
 
-const pieceName = { p: "pawn", r: "rook", n: "knight", b: "bishop", q: "queen", k: "king" };
+// Signaling
 
-function initGame() {
-    globals.isHost = location.hash === '#1';
-    globals.myColor = globals.isHost; // Host is White
-    globals.isWhiteView = globals.myColor;
-    document.getElementById("role-title").textContent = globals.isHost ? "HOST (White)" : "GUEST (Black)";
-    document.getElementById("status-msg").textContent = "Initializing Peer...";
-    setupNetwork();
-    globals.turn = true;
-    globals.boardState = [
-        ["r", "n", "b", "q", "k", "b", "n", "r"],
-        ["p", "p", "p", "p", "p", "p", "p", "p"],
-        [null, null, null, null, null, null, null, null],
-        [null, null, null, null, null, null, null, null],
-        [null, null, null, null, null, null, null, null],
-        [null, null, null, null, null, null, null, null],
-        ["P", "P", "P", "P", "P", "P", "P", "P"],
-        ["R", "N", "B", "Q", "K", "B", "N", "R"],
-    ];
-    globals.castle = { wK: true, wQ: true, bK: true, bQ: true };
-    globals.repetition = new Map();
-    globals.halfMoveClock = 0;
-    recordRepetition();
+const SIGNAL_BASE = `${location.origin}/projects/chessOnline/signal`;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Small helper: fetch JSON, but if server returns HTML/blank we get a readable error
+async function fetchJson(url, options) {
+  const res = await fetch(url, { cache: "no-store", ...options });
+  const text = await res.text();
+
+  try {
+    const j = JSON.parse(text);
+    return { res, j };
+  } catch {
+    throw new Error(
+      `Non-JSON response (HTTP ${res.status}) from ${url}. First 200 chars:\n${text.slice(0, 200)}`
+    );
+  }
 }
 
-function setupNetwork() {
+async function createRoom() {
+  const { j } = await fetchJson(`${SIGNAL_BASE}/create.php`);
+  if (!j.ok) throw new Error(j.error || "createRoom failed");
+  return j.code; // "123456"
+}
+
+async function putOffer(code, offerObj) {
+  const body = new URLSearchParams({ code, offer: JSON.stringify(offerObj) });
+  const { j } = await fetchJson(`${SIGNAL_BASE}/offer.php`, { method: "POST", body });
+  if (!j.ok) throw new Error(j.error || "putOffer failed");
+}
+
+async function getOffer(code) {
+  const { j } = await fetchJson(`${SIGNAL_BASE}/offer.php?code=${encodeURIComponent(code)}`);
+  return j.offer ? JSON.parse(j.offer) : null;
+}
+
+async function putAnswer(code, answerObj) {
+  const body = new URLSearchParams({ code, answer: JSON.stringify(answerObj) });
+  const { j } = await fetchJson(`${SIGNAL_BASE}/answer.php`, { method: "POST", body });
+  if (!j.ok) throw new Error(j.error || "putAnswer failed");
+}
+
+async function getAnswer(code) {
+  const { j } = await fetchJson(`${SIGNAL_BASE}/answer.php?code=${encodeURIComponent(code)}`);
+  return j.answer ? JSON.parse(j.answer) : null;
+}
+
+// Poll helper with a stop condition
+async function pollUntil(getFn, shouldStopFn, intervalMs = 900) {
+  while (!shouldStopFn()) {
+    const val = await getFn();
+    if (val) return val;
+    await sleep(intervalMs);
+  }
+  return null;
+}
+
+async function setupNetwork() {
+  // Reset per-session state
+  globals.connected = false;
+  globals.roomCode = null;
+  globals._sentOffer = false;
+  globals._sentAnswer = false;
+
+  // UI setup
+  const outBox = document.getElementById("outgoing");
+  const inBox = document.getElementById("incoming");
+  const copyBtn = document.getElementById("copyBtn");
+  const connectBtn = document.getElementById("connectBtn");
+  const status = document.getElementById("status-msg");
+
+  copyBtn.disabled = true;
+  outBox.value = "";
+  // Don't clear guest's input automatically; it's annoying if they mistype.
+  // inBox.value = "";
+
+  // If host, create room code immediately so it can be shared
+  if (globals.isHost) {
     try {
-        globals.peer = new SimplePeer({ 
-            initiator: globals.isHost, 
-            trickle: false,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ]
-            }
-        });
+      globals.roomCode = await createRoom();
+      outBox.value = globals.roomCode;
+      copyBtn.disabled = false;
+      status.textContent = `Room created. Share this code with your guest: ${globals.roomCode}`;
     } catch (e) {
-        alert("Peer failed to start. Ensure you are using a modern browser (Chrome/Edge/Firefox).");
-        return;
+      alert("Failed to create room code: " + e.message);
+      status.textContent = "Failed to create room.";
+      return;
     }
-
-    globals.peer.on('signal', data => {
-        const json = JSON.stringify(data);
-        const code = btoa(json);         
-        const outBox = document.getElementById('outgoing');
-        outBox.value = code;
-        document.getElementById('copyBtn').disabled = false;
-        if (globals.isHost) {
-            document.getElementById('status-msg').textContent = "STEP 1: Copy YOUR CODE and send to Guest.";
-        } else {
-            document.getElementById('status-msg').textContent = "STEP 2: Copy YOUR CODE and send back to Host.";
-        }
+  } else {
+    status.textContent = "Enter the 6-digit code from the host, then click Connect.";
+  }
+  if (globals.isHost) {
+    // Host color selector
+    const radios = document.querySelectorAll('input[name="hostColor"]');
+    radios.forEach(r => {
+        r.addEventListener("change", (e) => {
+        const v = e.target.value;
+        globals.myColor = (v === "white");
+        globals.isWhiteView = globals.myColor;
+        updateRoleTitle();
+        });
     });
+  }
 
-    globals.peer.on('connect', () => {
-        globals.connected = true;
-        document.getElementById('connection-panel').style.display = 'none';
-        document.getElementById('game-wrap').style.display = 'flex';
-        alert("🟢 P2P Connection Established!\n\nGame is starting.");
-        
+
+  // Create peer
+  try {
+    globals.peer = new SimplePeer({
+      initiator: globals.isHost,
+      trickle: false,
+      config: {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:global.stun.twilio.com:3478" }
+        ]
+      }
+    });
+  } catch (e) {
+    alert("Peer failed to start. Ensure you are using a modern browser (Chrome/Edge/Firefox).");
+    status.textContent = "Peer failed to start.";
+    return;
+  }
+
+  // Signaling: host uploads OFFER then polls for ANSWER; guest polls OFFER then uploads ANSWER
+  globals.peer.on("signal", async (data) => {
+    try {
+      if (globals.isHost) {
+        if (globals._sentOffer) return;
+        globals._sentOffer = true;
+
+        await putOffer(globals.roomCode, data);
+        status.textContent = "Waiting for guest to join...";
+
+        const ans = await pollUntil(
+          () => getAnswer(globals.roomCode),
+          () => globals.connected,
+          900
+        );
+
+        if (ans && !globals.connected) {
+          globals.peer.signal(ans);
+          status.textContent = "Answer received. Connecting...";
+        }
+      } else {
+        if (globals._sentAnswer) return;
+        globals._sentAnswer = true;
+
+        if (!globals.roomCode) {
+          // This shouldn't happen if Connect button flow is followed
+          throw new Error("Guest has no room code set. Enter code and click Connect first.");
+        }
+
+        await putAnswer(globals.roomCode, data);
+        status.textContent = "Answer sent. Connecting...";
+      }
+    } catch (e) {
+      alert("Signaling error: " + e.message);
+      status.textContent = "Signaling error.";
+    }
+  });
+
+    globals.peer.on("connect", () => {
+    globals.connected = true;
+
+    document.getElementById('connection-panel').style.display = 'none';
+    document.getElementById('game-wrap').style.display = 'flex';
+
+    // Host tells guest which color host chose
+    if (globals.isHost) {
+        globals.peer.send(JSON.stringify({ type: "meta", hostColor: globals.myColor }));
+
+        // Host can start immediately
         initializeBoard();
         updateStatus();
+    } else {
+        // Guest waits for meta before starting (so orientation/color is correct)
+        document.getElementById("turn-indicator").textContent = "Waiting for host settings...";
+    }
     });
 
-    globals.peer.on('data', data => {
-        try {
-            const msg = JSON.parse(data);
-            handleNetworkMessage(msg);
-        } catch (e) {
-            console.error("Data error:", e);
-        }
-    });
 
-    globals.peer.on('error', err => {
-        console.error("SimplePeer Error:", err);
-        if (err.code === 'ERR_WEBRTC_SUPPORT') {
-            alert("Your browser doesn't support WebRTC.");
-        } else if (err.code === 'ERR_DATA_CHANNEL') {
-        } else {
-            alert("Connection Error: " + err.message + "\n\nPlease reload the page and try again.");
-        }
-    });
+  globals.peer.on("data", (data) => {
+    try {
+      const msg = JSON.parse(data);
+      handleNetworkMessage(msg);
+    } catch (e) {
+      console.error("Data error:", e);
+    }
+  });
 
-    document.getElementById('copyBtn').onclick = () => {
-        const outBox = document.getElementById('outgoing');
-        outBox.select();
-        document.execCommand('copy');
-        document.getElementById('copyBtn').textContent = "COPIED!";
-        setTimeout(() => document.getElementById('copyBtn').textContent = "Copy Code", 2000);
-    };
+  globals.peer.on("error", (err) => {
+    console.error("SimplePeer Error:", err);
+    if (err.code === "ERR_WEBRTC_SUPPORT") {
+      alert("Your browser doesn't support WebRTC.");
+    } else {
+      alert("Connection Error: " + err.message + "\n\nPlease reload the page and try again.");
+    }
+  });
 
-    document.getElementById('connectBtn').onclick = () => {
-        const inBox = document.getElementById('incoming');
-        const codeStr = inBox.value.trim();
-        
-        if (!codeStr) {
-            alert("Please paste the opponent's code first.");
-            return;
-        }
-        
-        try {
-            const json = atob(codeStr);
-            const signalData = JSON.parse(json);
-            
-            document.getElementById('status-msg').textContent = "Connecting... Please wait.";
-            globals.peer.signal(signalData);
-        } catch (e) {
-            alert("Invalid Code!\n\nPlease make sure you copied the ENTIRE code string.");
-        }
-    };
+  // Copy room code (host)
+  copyBtn.onclick = () => {
+    outBox.select();
+    document.execCommand("copy");
+    copyBtn.textContent = "COPIED!";
+    setTimeout(() => (copyBtn.textContent = "Copy Code"), 2000);
+  };
+
+  // Guest connect: poll for OFFER, then signal it
+  connectBtn.onclick = async () => {
+    if (globals.isHost) {
+      alert("Host doesn't need to press Connect — just share the 6-digit code.");
+      return;
+    }
+
+    const code = inBox.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      alert("Please enter a valid 6-digit room code.");
+      return;
+    }
+
+    // Prevent spam-click starting multiple poll loops
+    connectBtn.disabled = true;
+
+    globals.roomCode = code;
+    status.textContent = "Looking up room...";
+
+    try {
+      const offer = await pollUntil(
+        () => getOffer(globals.roomCode),
+        () => globals.connected,
+        900
+      );
+
+      if (!offer) {
+        // Stopped because connected (rare) or something else
+        return;
+      }
+
+      status.textContent = "Offer received. Sending answer...";
+      globals.peer.signal(offer);
+    } catch (e) {
+      alert("Failed to join room: " + e.message);
+      status.textContent = "Failed to join room.";
+      connectBtn.disabled = false;
+    }
+  };
+}
+
+async function deleteRoom(code) {
+  const body = new URLSearchParams({ code });
+  const res = await fetch(`${SIGNAL_BASE}/delete.php`, { method: "POST", body });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || "deleteRoom failed");
+  return j.deleted;
+}
+
+function updateRoleTitle() {
+  const role = globals.isHost ? "HOST" : "GUEST";
+  const color = globals.myColor ? "White" : "Black";
+  document.getElementById("role-title").textContent = `${role} (${color})`;
 }
 
 function handleNetworkMessage(msg) {
     if (globals.gameOver) return;
     switch (msg.type) {
+        case "meta":
+            // msg.hostColor is true if host is White, false if host is Black
+            // Guest is the opposite
+            globals.myColor = !msg.hostColor;
+            globals.isWhiteView = globals.myColor;
+            updateRoleTitle();
+            // Now start the game for guest
+            initializeBoard();
+            updateStatus();
+            break;
         case 'move':
             tryMove(msg.to[0], msg.to[1], { 
                 from: msg.from, 
@@ -174,6 +337,39 @@ function resetDrawButton() {
         btn.textContent = "Offer Draw";
         btn.disabled = false;
     }
+}
+
+const pieceName = { p: "pawn", r: "rook", n: "knight", b: "bishop", q: "queen", k: "king" };
+
+async function initGame() {
+    globals.isHost = location.hash === "#1";
+    if (globals.isHost) {
+        const checked = document.querySelector('input[name="hostColor"]:checked');
+        globals.myColor = checked ? (checked.value === "white") : true;
+    } else {
+        globals.myColor = false;
+    }
+    globals.isWhiteView = globals.myColor;
+    document.getElementById("host-panel").style.display = globals.isHost ? "block" : "none";
+    document.getElementById("guest-panel").style.display = globals.isHost ? "none" : "block";
+    updateRoleTitle();
+    document.getElementById("status-msg").textContent = "Initializing Peer...";
+    await setupNetwork();
+    globals.turn = true;
+    globals.boardState = [
+        ["r", "n", "b", "q", "k", "b", "n", "r"],
+        ["p", "p", "p", "p", "p", "p", "p", "p"],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        ["P", "P", "P", "P", "P", "P", "P", "P"],
+        ["R", "N", "B", "Q", "K", "B", "N", "R"],
+    ];
+    globals.castle = { wK: true, wQ: true, bK: true, bQ: true };
+    globals.repetition = new Map();
+    globals.halfMoveClock = 0;
+    recordRepetition();
 }
 
 // Game Logic
@@ -713,5 +909,33 @@ function applyMove(board, fr, fc, tr, tc, movingPiece, oldEP) {
     return b;
 }
 
-setupUI();
-initGame();
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("Unhandled rejection reason:", e.reason);
+});
+
+function bootFail(msg, err) {
+  const el = document.getElementById("status-msg");
+  if (el) el.textContent = msg;
+  console.error(msg, err || "");
+  alert(msg);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  console.log("✅ script.js loaded");
+
+  // If SimplePeer didn't load, nothing will work
+  if (typeof SimplePeer === "undefined") {
+    bootFail("SimplePeer failed to load (CDN blocked or script tag missing).", null);
+    return;
+  }
+
+  try {
+    setupUI();
+
+    initGame().catch((e) => {
+      bootFail("initGame failed: " + (e?.message || e), e);
+    });
+  } catch (e) {
+    bootFail("Startup error: " + (e?.message || e), e);
+  }
+});
