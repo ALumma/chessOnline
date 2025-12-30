@@ -8,6 +8,11 @@ const globals = {
     castle: { wK: true, wQ: true, bK: true, bQ: true },
     repetition: new Map(),
     halfMoveClock: 0,
+    fullMoveNumber: 1,
+    roleChosen: false,
+    gameOver: false,
+    newGameOfferPending: false,
+    newGameRequestedColor: null,
     // Network
     isHost: false,
     myColor: true,
@@ -25,7 +30,6 @@ const SIGNAL_BASE = `${location.origin}/projects/chessOnline/signal`;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Small helper: fetch JSON, but if server returns HTML/blank we get a readable error
 async function fetchJson(url, options) {
   const res = await fetch(url, { cache: "no-store", ...options });
   const text = await res.text();
@@ -120,7 +124,6 @@ async function setupNetwork() {
         const v = e.target.value;
         globals.myColor = (v === "white");
         globals.isWhiteView = globals.myColor;
-        updateRoleTitle();
         });
     });
   }
@@ -182,11 +185,12 @@ async function setupNetwork() {
     }
   });
 
-    globals.peer.on("connect", () => {
+  globals.peer.on("connect", () => {
     globals.connected = true;
 
     document.getElementById('connection-panel').style.display = 'none';
     document.getElementById('game-wrap').style.display = 'flex';
+    updateNewGameButton();
 
     // Host tells guest which color host chose
     if (globals.isHost) {
@@ -277,21 +281,15 @@ async function deleteRoom(code) {
   return j.deleted;
 }
 
-function updateRoleTitle() {
-  const role = globals.isHost ? "HOST" : "GUEST";
-  const color = globals.myColor ? "White" : "Black";
-  document.getElementById("role-title").textContent = `${role} (${color})`;
-}
-
 function handleNetworkMessage(msg) {
-    if (globals.gameOver) return;
+    const allowDuringGameOver = msg && ["new_game_offer", "new_game_accepted", "new_game_declined"].includes(msg.type);
+    if (globals.gameOver && !allowDuringGameOver) return;
     switch (msg.type) {
         case "meta":
             // msg.hostColor is true if host is White, false if host is Black
             // Guest is the opposite
             globals.myColor = !msg.hostColor;
             globals.isWhiteView = globals.myColor;
-            updateRoleTitle();
             // Now start the game for guest
             initializeBoard();
             updateStatus();
@@ -306,6 +304,7 @@ function handleNetworkMessage(msg) {
         case 'resign':
             alert("Opponent Resigned! You Win!");
             globals.gameOver = true;
+            setGameOverIndicator(`${globals.myColor ? "White" : "Black"} Wins`);
             break;
         case 'offer_draw':
             setTimeout(() => {
@@ -314,6 +313,7 @@ function handleNetworkMessage(msg) {
                     globals.peer.send(JSON.stringify({ type: 'draw_accepted' }));
                     alert("Draw agreed!");
                     globals.gameOver = true;
+                    setGameOverIndicator("Draw");
                 } else {
                     globals.peer.send(JSON.stringify({ type: 'draw_declined' }));
                 }
@@ -322,11 +322,58 @@ function handleNetworkMessage(msg) {
         case 'draw_accepted':
             alert("Opponent accepted the draw. Game Over.");
             globals.gameOver = true;
+            setGameOverIndicator("Draw");
             resetDrawButton();
             break;
         case 'draw_declined':
             alert("Opponent declined the draw.");
             resetDrawButton();
+            break;
+        case 'new_game_offer': {
+            if (!globals.gameOver) {
+                alert("Opponent offered a new game, but the current game is still active.");
+                break;
+            }
+            const requesterColor = !!msg.requesterColor;
+            const wants = requesterColor ? "White" : "Black";
+            if (globals.newGameOfferPending) {
+                let hostColor;
+                if (globals.isHost) {
+                    hostColor = !!globals.newGameRequestedColor;
+                } else {
+                    hostColor = requesterColor;
+                }
+                globals.newGameOfferPending = false;
+                globals.newGameRequestedColor = null;
+                globals.peer.send(JSON.stringify({ type: 'new_game_accepted', hostColor }));
+                startNewGame(hostColor);
+                break;
+            }
+            setTimeout(() => {
+                const agree = confirm(`Opponent offers a new game and wants to play ${wants}. Accept?`);
+                if (agree) {
+                    let hostColor;
+                    if (globals.isHost) hostColor = !requesterColor;
+                    else hostColor = requesterColor;
+                    globals.peer.send(JSON.stringify({ type: 'new_game_accepted', hostColor }));
+                    startNewGame(hostColor);
+                } else {
+                    globals.peer.send(JSON.stringify({ type: 'new_game_declined' }));
+                    updateNewGameButton();
+                }
+            }, 100);
+            break;
+        }
+        case 'new_game_accepted':
+            globals.newGameOfferPending = false;
+            globals.newGameRequestedColor = null;
+            startNewGame(!!msg.hostColor);
+            break;
+        case 'new_game_declined':
+            globals.newGameOfferPending = false;
+            globals.newGameRequestedColor = null;
+            alert("Opponent declined the new game.");
+            updateNewGameButton();
             break;
     }
 }
@@ -341,8 +388,8 @@ function resetDrawButton() {
 
 const pieceName = { p: "pawn", r: "rook", n: "knight", b: "bishop", q: "queen", k: "king" };
 
-async function initGame() {
-    globals.isHost = location.hash === "#1";
+async function initGame(isHost) {
+    globals.isHost = isHost;
     if (globals.isHost) {
         const checked = document.querySelector('input[name="hostColor"]:checked');
         globals.myColor = checked ? (checked.value === "white") : true;
@@ -352,24 +399,10 @@ async function initGame() {
     globals.isWhiteView = globals.myColor;
     document.getElementById("host-panel").style.display = globals.isHost ? "block" : "none";
     document.getElementById("guest-panel").style.display = globals.isHost ? "none" : "block";
-    updateRoleTitle();
     document.getElementById("status-msg").textContent = "Initializing Peer...";
     await setupNetwork();
-    globals.turn = true;
-    globals.boardState = [
-        ["r", "n", "b", "q", "k", "b", "n", "r"],
-        ["p", "p", "p", "p", "p", "p", "p", "p"],
-        [null, null, null, null, null, null, null, null],
-        [null, null, null, null, null, null, null, null],
-        [null, null, null, null, null, null, null, null],
-        [null, null, null, null, null, null, null, null],
-        ["P", "P", "P", "P", "P", "P", "P", "P"],
-        ["R", "N", "B", "Q", "K", "B", "N", "R"],
-    ];
-    globals.castle = { wK: true, wQ: true, bK: true, bQ: true };
-    globals.repetition = new Map();
-    globals.halfMoveClock = 0;
-    recordRepetition();
+    resetGameState();
+    updateNewGameButton();
 }
 
 // Game Logic
@@ -454,7 +487,9 @@ function tryMove(toRow, toCol, remoteMove = null) {
     }
     globals.boardState[toRow][toCol] = placed;
     globals.boardState[fr][fc] = null;
+    const movingWasWhite = globals.turn;
     globals.turn = !globals.turn;
+    if (!movingWasWhite) globals.fullMoveNumber++;
     if (!remoteMove && globals.connected) {
         const payload = {
             type: 'move',
@@ -478,6 +513,14 @@ function updateStatus() {
     ind.style.color = globals.turn === globals.myColor ? "green" : "black";
 }
 
+function setGameOverIndicator(text) {
+    const ind = document.getElementById("turn-indicator");
+    if (!ind) return;
+    ind.textContent = text;
+    ind.style.color = "black";
+    updateNewGameButton();
+}
+
 function setupUI() {
     const resignBtn = document.getElementById("resignBtn");
     if (resignBtn) {
@@ -487,6 +530,7 @@ function setupUI() {
                 globals.peer.send(JSON.stringify({ type: 'resign' }));
                 alert("You resigned. You lose.");
                 globals.gameOver = true;
+                setGameOverIndicator(`${globals.myColor ? "Black" : "White"} Wins`);
             }
         });
     }
@@ -505,6 +549,77 @@ function setupUI() {
             }, 5000);
         });
     }
+    const fenBtn = document.getElementById("fenBtn");
+    if (fenBtn) {
+        fenBtn.addEventListener("click", () => {
+            downloadFen();
+        });
+    }
+    const newGameBtn = document.getElementById("newGameBtn");
+    if (newGameBtn) {
+        newGameBtn.addEventListener("click", () => {
+            if (!globals.connected || !globals.gameOver) return;
+            const input = prompt("Play as (white/black):", "white");
+            if (input === null) return;
+            const choice = input.trim().toLowerCase();
+            if (choice !== "white" && choice !== "black") {
+                alert("Please enter 'white' or 'black'.");
+                return;
+            }
+            const requesterColor = choice === "white";
+            globals.newGameOfferPending = true;
+            globals.newGameRequestedColor = requesterColor;
+            globals.peer.send(JSON.stringify({ type: 'new_game_offer', requesterColor }));
+            newGameBtn.textContent = "Offer Sent...";
+            newGameBtn.disabled = true;
+        });
+    }
+}
+
+function resetGameState() {
+    globals.turn = true;
+    globals.boardState = [
+        ["r", "n", "b", "q", "k", "b", "n", "r"],
+        ["p", "p", "p", "p", "p", "p", "p", "p"],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null],
+        ["P", "P", "P", "P", "P", "P", "P", "P"],
+        ["R", "N", "B", "Q", "K", "B", "N", "R"],
+    ];
+    globals.castle = { wK: true, wQ: true, bK: true, bQ: true };
+    globals.repetition = new Map();
+    globals.halfMoveClock = 0;
+    globals.fullMoveNumber = 1;
+    globals.enPassant = null;
+    globals.selected = null;
+    globals.gameOver = false;
+    globals.newGameOfferPending = false;
+    globals.newGameRequestedColor = null;
+    recordRepetition();
+}
+
+function updateNewGameButton() {
+    const btn = document.getElementById("newGameBtn");
+    if (!btn) return;
+    if (!globals.connected) {
+        btn.disabled = true;
+        btn.textContent = "New Game";
+        return;
+    }
+    btn.disabled = !globals.gameOver;
+    btn.textContent = "New Game";
+}
+
+function startNewGame(hostColor) {
+    globals.myColor = globals.isHost ? hostColor : !hostColor;
+    globals.isWhiteView = globals.myColor;
+    resetGameState();
+    initializeBoard();
+    resetDrawButton();
+    updateStatus();
+    updateNewGameButton();
 }
 
 function cloneBoard(board) { return board.map(row => row.slice()); }
@@ -526,6 +641,57 @@ function positionKey() {
     let ep = "-";
     if (globals.enPassant && enPassantCaptureIsPossible()) ep = `${globals.enPassant.row},${globals.enPassant.col}`;
     return `${boardStr} ${turnStr} ${cast} ${ep}`;
+}
+
+function getFEN() {
+    const rows = [];
+    for (let r = 0; r < 8; r++) {
+        let empty = 0;
+        let row = "";
+        for (let c = 0; c < 8; c++) {
+            const p = globals.boardState[r][c];
+            if (!p) {
+                empty++;
+            } else {
+                if (empty > 0) {
+                    row += String(empty);
+                    empty = 0;
+                }
+                row += p;
+            }
+        }
+        if (empty > 0) row += String(empty);
+        rows.push(row);
+    }
+    const placement = rows.join("/");
+    const active = globals.turn ? "w" : "b";
+    let castling = "";
+    if (globals.castle.wK) castling += "K";
+    if (globals.castle.wQ) castling += "Q";
+    if (globals.castle.bK) castling += "k";
+    if (globals.castle.bQ) castling += "q";
+    if (castling === "") castling = "-";
+    let ep = "-";
+    if (globals.enPassant && enPassantCaptureIsPossible()) {
+        const file = String.fromCharCode("a".charCodeAt(0) + globals.enPassant.col);
+        const rank = String(8 - globals.enPassant.row);
+        ep = `${file}${rank}`;
+    }
+    return `${placement} ${active} ${castling} ${ep} ${globals.halfMoveClock} ${globals.fullMoveNumber}`;
+}
+
+function downloadFen() {
+    const fen = getFEN();
+    const blob = new Blob([fen + "\n"], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "game.fen";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+    }, 0);
 }
 
 function enPassantCaptureIsPossible() {
@@ -685,15 +851,35 @@ function recordRepetition() {
 function checkGameOver() {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            if (globals.halfMoveClock >= 100) { alert("Draw by 50-move rule!"); return; }
-            if (isInsufficientMaterial()) { alert("Draw by insufficient material!"); return; }
+            if (globals.halfMoveClock >= 100) {
+                alert("Draw by 50-move rule!");
+                globals.gameOver = true;
+                setGameOverIndicator("Draw");
+                return;
+            }
+            if (isInsufficientMaterial()) {
+                alert("Draw by insufficient material!");
+                globals.gameOver = true;
+                setGameOverIndicator("Draw");
+                return;
+            }
             const repCount = recordRepetition();
-            if (repCount >= 3) { alert("Threefold repetition! Draw."); return; }
+            if (repCount >= 3) {
+                alert("Threefold repetition! Draw.");
+                globals.gameOver = true;
+                setGameOverIndicator("Draw");
+                return;
+            }
             const endState = getEndStateForSideToMove();
             if (endState === "checkmate") {
+                const winner = globals.turn ? "Black" : "White";
                 alert(`Checkmate! ${globals.turn ? "White" : "Black"} is checkmated.`);
+                globals.gameOver = true;
+                setGameOverIndicator(`${winner} Wins`);
             } else if (endState === "stalemate") {
                 alert("Stalemate! Draw.");
+                globals.gameOver = true;
+                setGameOverIndicator("Draw");
             }
         });
     });
@@ -921,9 +1107,6 @@ function bootFail(msg, err) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  console.log("✅ script.js loaded");
-
-  // If SimplePeer didn't load, nothing will work
   if (typeof SimplePeer === "undefined") {
     bootFail("SimplePeer failed to load (CDN blocked or script tag missing).", null);
     return;
@@ -931,10 +1114,21 @@ window.addEventListener("DOMContentLoaded", () => {
 
   try {
     setupUI();
-
-    initGame().catch((e) => {
-      bootFail("initGame failed: " + (e?.message || e), e);
-    });
+    const status = document.getElementById("status-msg");
+    if (status) status.textContent = "Choose to host or join to get started.";
+    const hostBtn = document.getElementById("choose-host");
+    const guestBtn = document.getElementById("choose-guest");
+    const rolePanel = document.getElementById("role-panel");
+    const startWithRole = (isHost) => {
+      if (globals.roleChosen) return;
+      globals.roleChosen = true;
+      if (rolePanel) rolePanel.style.display = "none";
+      initGame(isHost).catch((e) => {
+        bootFail("initGame failed: " + (e?.message || e), e);
+      });
+    };
+    if (hostBtn) hostBtn.addEventListener("click", () => startWithRole(true));
+    if (guestBtn) guestBtn.addEventListener("click", () => startWithRole(false));
   } catch (e) {
     bootFail("Startup error: " + (e?.message || e), e);
   }

@@ -22,6 +22,8 @@
       <div class="controls">
         <button id="drawBtn" type="button">Offer Draw</button>
         <button id="resignBtn" type="button">Resign</button>
+        <button id="fenBtn" type="button">Export FEN</button>
+        <button id="newGameBtn" type="button" disabled>New Game</button>
       </div>
     </div>
   </div>
@@ -33,7 +35,12 @@
         Initializing...
       </div>
 
-      <!-- HOST VIEW (only shown when URL ends with #1) -->
+      <div id="role-panel" style="margin-bottom:16px;">
+        <button id="choose-host" type="button">Host a Game</button>
+        <button id="choose-guest" type="button">Join a Game</button>
+      </div>
+
+      <!-- HOST VIEW -->
       <div id="host-panel" style="display:none;">
         <div class="code-area">
           <label>Play as:</label>
@@ -56,7 +63,7 @@
         </div>
       </div>
 
-      <!-- GUEST VIEW (shown when URL does NOT end with #1) -->
+      <!-- GUEST VIEW -->
       <div id="guest-panel" style="display:none;">
         <div class="code-area">
           <label>ENTER ROOM CODE:</label>
