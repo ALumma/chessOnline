@@ -1,84 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Chess Online</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<title>Chess Online</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="styles.css">
 
-  <!-- SimplePeer must load before script.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+<script src="script.js"></script>
 </head>
-
-<body>
-  <h1>Chess Online</h1>
-
-  <div class="game-wrap" id="game-wrap" style="display:none;">
-    <div id="board"></div>
-
-    <div class="side-panel">
-      <div id="turn-indicator">Waiting...</div>
-
-      <div class="controls">
-        <button id="drawBtn" type="button">Offer Draw</button>
-        <button id="resignBtn" type="button">Resign</button>
-        <button id="fenBtn" type="button">Export FEN</button>
-        <button id="newGameBtn" type="button" disabled>New Game</button>
-      </div>
+    <body>
+    <div id="rotate-overlay">
+        <div class="rotate-card">
+        <div class="rotate-title">Rotate your phone</div>
+        <div class="rotate-sub">This game is portrait-only.</div>
+        </div>
     </div>
-  </div>
+    <h1>Chess Online</h1>
+        <a class="github-link" href="https://github.com/ALumma/chessOnline" target="_blank" rel="noopener noreferrer">
+        <img class="github-icon" src="https://www.adriclumma.com/assets/github_logo.png" alt="GitHub">
+        GitHub
+        </a>
+    <div class="game-wrap" id="game-wrap" style="display:none;">
+        <div id="board"></div>
 
-  <div id="connection-panel">
-    <div class="connection-box">
-      <h2 id="role-title">Multiplayer Setup</h2>
-      <div id="status-msg" style="color:#ff5252; margin-bottom:15px; font-weight:bold;">
-        Initializing...
-      </div>
+        <div class="side-panel">
+        <div id="turn-indicator">Waiting...</div>
 
-      <div id="role-panel" style="margin-bottom:16px;">
-        <button id="choose-host" type="button">Host a Game</button>
-        <button id="choose-guest" type="button">Join a Game</button>
-      </div>
-
-      <!-- HOST VIEW -->
-      <div id="host-panel" style="display:none;">
-        <div class="code-area">
-          <label>Play as:</label>
-          <div style="display:flex; gap:14px; margin:8px 0 12px 0;">
-            <label style="display:flex; align-items:center; gap:6px;">
-              <input type="radio" name="hostColor" value="white" checked>
-              White
-            </label>
-            <label style="display:flex; align-items:center; gap:6px;">
-              <input type="radio" name="hostColor" value="black">
-              Black
-            </label>
-          </div>
+        <div class="controls">
+            <button id="drawBtn" type="button">Offer Draw</button>
+            <button id="resignBtn" type="button">Resign</button>
+            <button id="fenBtn" type="button">Copy FEN</button>
+            <button id="newGameBtn" type="button" disabled>New Game</button>
         </div>
-
-        <div class="code-area">
-          <label>ROOM CODE (Send this to opponent):</label>
-          <textarea id="outgoing" readonly placeholder="Generating code..."></textarea>
-          <button id="copyBtn" disabled>Copy Code</button>
         </div>
-      </div>
-
-      <!-- GUEST VIEW -->
-      <div id="guest-panel" style="display:none;">
-        <div class="code-area">
-          <label>ENTER ROOM CODE:</label>
-          <textarea id="incoming" placeholder="Enter the 6-digit code..."></textarea>
-          <button id="connectBtn">Connect</button>
-        </div>
-
-        <div style="margin-top:10px; font-size:0.95rem; opacity:0.9;">
-          Ask the host for the 6-digit room code.
-        </div>
-      </div>
     </div>
-  </div>
 
-  <!-- Your code -->
-  <script src="script.js"></script>
-</body>
+    <div id="connection-panel">
+        <div class="connection-box">
+        <h2 id="role-title">Multiplayer Setup</h2>
+        <div id="status-msg" style="color:#ff5252; margin-bottom:15px; font-weight:bold;">
+            Initializing...
+        </div>
+
+        <div id="role-panel" style="margin-bottom:16px;">
+            <button id="choose-host" type="button">Host a Game</button>
+            <button id="choose-guest" type="button">Join a Game</button>
+        </div>
+
+        <!-- HOST VIEW -->
+        <div id="host-panel" style="display:none;">
+            <div class="code-area">
+            <label>Play as:</label>
+            <div style="display:flex; gap:14px; margin:8px 0 12px 0;">
+                <label style="display:flex; align-items:center; gap:6px;">
+                <input type="radio" name="hostColor" value="white" checked>
+                White
+                </label>
+                <label style="display:flex; align-items:center; gap:6px;">
+                <input type="radio" name="hostColor" value="black">
+                Black
+                </label>
+            </div>
+            </div>
+
+            <div class="code-area">
+            <label>ROOM CODE (Send this to opponent):</label>
+            <textarea id="outgoing" readonly placeholder="Generating code..."></textarea>
+            <button id="copyBtn" disabled>Copy Code</button>
+            </div>
+        </div>
+
+        <!-- GUEST VIEW -->
+        <div id="guest-panel" style="display:none;">
+            <div class="code-area">
+            <label>ENTER ROOM CODE:</label>
+            <textarea id="incoming" placeholder="Enter the 6-digit code..."></textarea>
+            <button id="connectBtn">Connect</button>
+            </div>
+
+            <div style="margin-top:10px; font-size:0.95rem; opacity:0.9;">
+            Ask the host for the 6-digit room code.
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <dialog id="app-modal" class="app-modal">
+        <form id="app-modal-form" method="dialog" class="app-modal__form">
+            <h3 id="app-modal-title" class="app-modal__title"></h3>
+
+            <div id="app-modal-message" class="app-modal__message"></div>
+
+            <input id="app-modal-input" class="app-modal__input" type="text" autocomplete="off" />
+
+            <div id="app-modal-choices" class="app-modal__choices"></div>
+
+            <div class="app-modal__buttons">
+            <button id="app-modal-cancel" class="app-modal__btn app-modal__btn--ghost" value="cancel">Cancel</button>
+            <button id="app-modal-ok" class="app-modal__btn" value="ok">OK</button>
+            </div>
+        </form>
+    </dialog>
+    </body>
 </html>

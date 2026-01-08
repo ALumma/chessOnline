@@ -95,13 +95,15 @@ async function setupNetwork() {
   const copyBtn = document.getElementById("copyBtn");
   const connectBtn = document.getElementById("connectBtn");
   const status = document.getElementById("status-msg");
-
+  inBox.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      connectBtn.click();
+    }
+  });
   copyBtn.disabled = true;
   outBox.value = "";
-  // Don't clear guest's input automatically; it's annoying if they mistype.
-  // inBox.value = "";
 
-  // If host, create room code immediately so it can be shared
   if (globals.isHost) {
     try {
       globals.roomCode = await createRoom();
@@ -117,7 +119,6 @@ async function setupNetwork() {
     status.textContent = "Enter the 6-digit code from the host, then click Connect.";
   }
   if (globals.isHost) {
-    // Host color selector
     const radios = document.querySelectorAll('input[name="hostColor"]');
     radios.forEach(r => {
         r.addEventListener("change", (e) => {
@@ -127,9 +128,6 @@ async function setupNetwork() {
         });
     });
   }
-
-
-  // Create peer
   try {
     globals.peer = new SimplePeer({
       initiator: globals.isHost,
@@ -146,8 +144,6 @@ async function setupNetwork() {
     status.textContent = "Peer failed to start.";
     return;
   }
-
-  // Signaling: host uploads OFFER then polls for ANSWER; guest polls OFFER then uploads ANSWER
   globals.peer.on("signal", async (data) => {
     try {
       if (globals.isHost) {
@@ -172,10 +168,8 @@ async function setupNetwork() {
         globals._sentAnswer = true;
 
         if (!globals.roomCode) {
-          // This shouldn't happen if Connect button flow is followed
           throw new Error("Guest has no room code set. Enter code and click Connect first.");
         }
-
         await putAnswer(globals.roomCode, data);
         status.textContent = "Answer sent. Connecting...";
       }
@@ -187,25 +181,18 @@ async function setupNetwork() {
 
   globals.peer.on("connect", () => {
     globals.connected = true;
-
     document.getElementById('connection-panel').style.display = 'none';
     document.getElementById('game-wrap').style.display = 'flex';
     updateNewGameButton();
-
-    // Host tells guest which color host chose
     if (globals.isHost) {
         globals.peer.send(JSON.stringify({ type: "meta", hostColor: globals.myColor }));
-
         // Host can start immediately
         initializeBoard();
         updateStatus();
     } else {
-        // Guest waits for meta before starting (so orientation/color is correct)
         document.getElementById("turn-indicator").textContent = "Waiting for host settings...";
     }
     });
-
-
   globals.peer.on("data", (data) => {
     try {
       const msg = JSON.parse(data);
@@ -214,7 +201,6 @@ async function setupNetwork() {
       console.error("Data error:", e);
     }
   });
-
   globals.peer.on("error", (err) => {
     console.error("SimplePeer Error:", err);
     if (err.code === "ERR_WEBRTC_SUPPORT") {
@@ -223,46 +209,32 @@ async function setupNetwork() {
       alert("Connection Error: " + err.message + "\n\nPlease reload the page and try again.");
     }
   });
-
-  // Copy room code (host)
   copyBtn.onclick = () => {
     outBox.select();
     document.execCommand("copy");
     copyBtn.textContent = "COPIED!";
     setTimeout(() => (copyBtn.textContent = "Copy Code"), 2000);
   };
-
-  // Guest connect: poll for OFFER, then signal it
   connectBtn.onclick = async () => {
     if (globals.isHost) {
       alert("Host doesn't need to press Connect — just share the 6-digit code.");
       return;
     }
-
     const code = inBox.value.trim();
     if (!/^\d{6}$/.test(code)) {
       alert("Please enter a valid 6-digit room code.");
       return;
     }
-
-    // Prevent spam-click starting multiple poll loops
     connectBtn.disabled = true;
-
     globals.roomCode = code;
     status.textContent = "Looking up room...";
-
     try {
       const offer = await pollUntil(
         () => getOffer(globals.roomCode),
         () => globals.connected,
         900
       );
-
-      if (!offer) {
-        // Stopped because connected (rare) or something else
-        return;
-      }
-
+      if (!offer) return;
       status.textContent = "Offer received. Sending answer...";
       globals.peer.signal(offer);
     } catch (e) {
@@ -281,38 +253,34 @@ async function deleteRoom(code) {
   return j.deleted;
 }
 
-function handleNetworkMessage(msg) {
+async function handleNetworkMessage(msg) {
     const allowDuringGameOver = msg && ["new_game_offer", "new_game_accepted", "new_game_declined"].includes(msg.type);
     if (globals.gameOver && !allowDuringGameOver) return;
     switch (msg.type) {
         case "meta":
-            // msg.hostColor is true if host is White, false if host is Black
-            // Guest is the opposite
             globals.myColor = !msg.hostColor;
             globals.isWhiteView = globals.myColor;
-            // Now start the game for guest
             initializeBoard();
             updateStatus();
             break;
         case 'move':
-            tryMove(msg.to[0], msg.to[1], { 
+            await tryMove(msg.to[0], msg.to[1], { 
                 from: msg.from, 
                 promotion: msg.promotion 
             });
             break;
-
         case 'resign':
-            alert("Opponent Resigned! You Win!");
             globals.gameOver = true;
+            await Modal.alert("Opponent Resigned! You Win!");
             setGameOverIndicator(`${globals.myColor ? "White" : "Black"} Wins`);
             break;
         case 'offer_draw':
-            setTimeout(() => {
-                const agree = confirm("Opponent offers a draw. Do you accept?");
+            setTimeout(async () => {
+                const agree = await Modal.confirm("Opponent offers a draw. Do you accept?");
                 if (agree) {
                     globals.peer.send(JSON.stringify({ type: 'draw_accepted' }));
-                    alert("Draw agreed!");
                     globals.gameOver = true;
+                    await Modal.alert("Draw agreed!");
                     setGameOverIndicator("Draw");
                 } else {
                     globals.peer.send(JSON.stringify({ type: 'draw_declined' }));
@@ -320,18 +288,18 @@ function handleNetworkMessage(msg) {
             }, 100);
             break;
         case 'draw_accepted':
-            alert("Opponent accepted the draw. Game Over.");
             globals.gameOver = true;
+            await Modal.alert("Opponent accepted the draw. Game Over.");
             setGameOverIndicator("Draw");
             resetDrawButton();
             break;
         case 'draw_declined':
-            alert("Opponent declined the draw.");
+            await Modal.alert("Opponent declined the draw.");
             resetDrawButton();
             break;
         case 'new_game_offer': {
             if (!globals.gameOver) {
-                alert("Opponent offered a new game, but the current game is still active.");
+                await Modal.alert("Opponent offered a new game, but the current game is still active.");
                 break;
             }
             const requesterColor = !!msg.requesterColor;
@@ -349,8 +317,15 @@ function handleNetworkMessage(msg) {
                 startNewGame(hostColor);
                 break;
             }
-            setTimeout(() => {
-                const agree = confirm(`Opponent offers a new game and wants to play ${wants}. Accept?`);
+            setTimeout(async () => {
+                const agree = await Modal.confirm(
+                `Opponent offers a new game and wants to play ${wants}. Accept?`,
+                {
+                    title: "New Game Offer",
+                    okText: "Accept",
+                    cancelText: "Decline",
+                }
+                );
                 if (agree) {
                     let hostColor;
                     if (globals.isHost) hostColor = !requesterColor;
@@ -372,7 +347,7 @@ function handleNetworkMessage(msg) {
         case 'new_game_declined':
             globals.newGameOfferPending = false;
             globals.newGameRequestedColor = null;
-            alert("Opponent declined the new game.");
+            await Modal.alert("Opponent declined the new game.");
             updateNewGameButton();
             break;
     }
@@ -405,9 +380,180 @@ async function initGame(isHost) {
     updateNewGameButton();
 }
 
+// Modal Helpers
+
+const Modal = (() => {
+  let dlg, titleEl, msgEl, inputEl, choicesEl, okBtn, cancelBtn;
+
+  function ensure() {
+    if (dlg) return;
+
+    dlg = document.getElementById("app-modal");
+    titleEl = document.getElementById("app-modal-title");
+    msgEl = document.getElementById("app-modal-message");
+    inputEl = document.getElementById("app-modal-input");
+    choicesEl = document.getElementById("app-modal-choices");
+    okBtn = document.getElementById("app-modal-ok");
+    cancelBtn = document.getElementById("app-modal-cancel");
+
+    // Prevent default "Esc closes" behavior from producing a browser-native cancel
+    dlg.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      dlg.close("cancel");
+    });
+  }
+
+  function fallbackAlert(msg) { window.alert(msg); }
+  function fallbackConfirm(msg) { return window.confirm(msg); }
+  function fallbackPrompt(msg, def = "") { return window.prompt(msg, def); }
+
+  function resetUI() {
+    titleEl.textContent = "";
+    msgEl.textContent = "";
+
+    inputEl.style.display = "none";
+    inputEl.value = "";
+
+    choicesEl.style.display = "none";
+    choicesEl.innerHTML = "";
+
+    okBtn.style.display = "";
+    cancelBtn.style.display = "";
+    okBtn.textContent = "OK";
+    cancelBtn.textContent = "Cancel";
+  }
+
+    function openModal() {
+        return new Promise((resolve) => {
+            const setupNewModal = () => {
+                const onClose = () => {
+                    dlg.removeEventListener("close", onClose);
+                    resolve({ returnValue: dlg.returnValue, input: inputEl.value });
+                };
+                dlg.addEventListener("close", onClose);
+                dlg.showModal();
+            };
+            if (dlg.open) {
+                const onExistingClose = () => {
+                    dlg.removeEventListener("close", onExistingClose);
+                    setTimeout(setupNewModal, 0);
+                };
+                dlg.addEventListener("close", onExistingClose);
+                dlg.close("cancel");
+            } else {
+                setupNewModal();
+            }
+        });
+    }
+  async function alert(message, { title = "Notice", okText = "OK" } = {}) {
+    ensure();
+    if (!dlg.showModal) return fallbackAlert(message);
+    resetUI();
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    okBtn.textContent = okText;
+    cancelBtn.style.display = "none";
+    await openModal();
+  }
+
+  async function confirm(message, { title = "Confirm", okText = "OK", cancelText = "Cancel" } = {}) {
+    ensure();
+    if (!dlg.showModal) return fallbackConfirm(message);
+    resetUI();
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+    const { returnValue } = await openModal();
+    return returnValue === "ok";
+  }
+
+  async function prompt(message, { title = "Input", okText = "OK", cancelText = "Cancel", defaultValue = "", placeholder = "" } = {}) {
+    ensure();
+    if (!dlg.showModal) return fallbackPrompt(message, defaultValue);
+    resetUI();
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    inputEl.style.display = "";
+    inputEl.value = defaultValue;
+    inputEl.placeholder = placeholder;
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+    queueMicrotask(() => {
+      inputEl.focus();
+      inputEl.select();
+    });
+    const { returnValue, input } = await openModal();
+    return returnValue === "ok" ? input : null;
+  }
+  async function choice(message, options, { title = "Choose", cancelText = "Cancel", defaultValue = null } = {}) {
+    ensure();
+    if (!dlg.showModal) return defaultValue;
+    resetUI();
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    okBtn.style.display = "none";
+    choicesEl.style.display = "flex";
+    for (const opt of options) {
+      const b = document.createElement("button");
+      b.className = "app-modal__btn";
+      b.type = "submit";
+      b.value = String(opt.value);
+      b.textContent = opt.label;
+      choicesEl.appendChild(b);
+    }
+    cancelBtn.textContent = cancelText;
+    const { returnValue } = await openModal();
+    if (returnValue === "cancel" || returnValue === "") return defaultValue;
+    return returnValue;
+  }
+  async function pickColor({
+    title = "New Game",
+    message = "Play as:",
+    okText = "Offer",
+    cancelText = "Cancel",
+    defaultValue = "white",
+    } = {}) {
+    ensure();
+    if (!dlg.showModal) {
+        const raw = window.prompt("Play as (white/black):", defaultValue);
+        if (raw == null) return null;
+        const v = raw.trim().toLowerCase();
+        return (v === "white" || v === "black") ? v : null;
+    }
+    resetUI();
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    choicesEl.style.display = "block";
+    choicesEl.innerHTML = `
+        <div style="display:flex; gap:14px; margin-top:10px;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="modalColor" value="white" ${defaultValue === "white" ? "checked" : ""}>
+            White
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="modalColor" value="black" ${defaultValue === "black" ? "checked" : ""}>
+            Black
+        </label>
+        </div>
+    `;
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+    queueMicrotask(() => {
+        const checked = choicesEl.querySelector('input[name="modalColor"]:checked');
+        checked?.focus();
+    });
+    const { returnValue } = await openModal();
+    if (returnValue !== "ok") return null;
+    const selected = choicesEl.querySelector('input[name="modalColor"]:checked');
+    return selected ? selected.value : null;
+    }
+  return { alert, confirm, prompt, choice, pickColor };
+})();
+
 // Game Logic
 
-function tryMove(toRow, toCol, remoteMove = null) {
+async function tryMove(toRow, toCol, remoteMove = null) {
     let fr, fc, promotionChoice;
 
     if (remoteMove) {
@@ -458,7 +604,7 @@ function tryMove(toRow, toCol, remoteMove = null) {
     if (moving && moving.toLowerCase() === "p" && (toRow === 0 || toRow === 7)) {
         let ch;
         if (remoteMove) ch = promotionChoice;
-        else ch = promoteChoice();
+        else ch = await promoteChoice();
         placed = (moving === "P") ? ch.toUpperCase() : ch;
     }
 
@@ -510,28 +656,31 @@ function updateStatus() {
     if (!ind) return;
     const turnText = globals.turn ? "White's Turn" : "Black's Turn";
     ind.textContent = `${turnText} ${globals.turn === globals.myColor ? "YOUR TURN" : "WAITING..."}`;
-    ind.style.color = globals.turn === globals.myColor ? "green" : "black";
 }
 
 function setGameOverIndicator(text) {
     const ind = document.getElementById("turn-indicator");
     if (!ind) return;
     ind.textContent = text;
-    ind.style.color = "black";
     updateNewGameButton();
 }
 
 function setupUI() {
     const resignBtn = document.getElementById("resignBtn");
     if (resignBtn) {
-        resignBtn.addEventListener("click", () => {
+        resignBtn.addEventListener("click", async () => {
             if (!globals.connected || globals.gameOver) return;
-            if (confirm("Are you sure you want to resign?")) {
-                globals.peer.send(JSON.stringify({ type: 'resign' }));
-                alert("You resigned. You lose.");
-                globals.gameOver = true;
-                setGameOverIndicator(`${globals.myColor ? "Black" : "White"} Wins`);
-            }
+
+            const ok = await Modal.confirm("Are you sure you want to resign?", {
+                title: "Resign",
+                okText: "Resign",
+                cancelText: "Cancel",
+            });
+            if (!ok) return;
+            globals.gameOver = true;
+            globals.peer.send(JSON.stringify({ type: "resign" }));
+            await Modal.alert("You resigned. You lose.", { title: "Game Over" });
+            setGameOverIndicator(`${globals.myColor ? "Black" : "White"} Wins`);
         });
     }
     const drawBtn = document.getElementById("drawBtn");
@@ -552,26 +701,27 @@ function setupUI() {
     const fenBtn = document.getElementById("fenBtn");
     if (fenBtn) {
         fenBtn.addEventListener("click", () => {
-            downloadFen();
+            copyFen();
         });
     }
     const newGameBtn = document.getElementById("newGameBtn");
     if (newGameBtn) {
-        newGameBtn.addEventListener("click", () => {
-            if (!globals.connected || !globals.gameOver) return;
-            const input = prompt("Play as (white/black):", "white");
-            if (input === null) return;
-            const choice = input.trim().toLowerCase();
-            if (choice !== "white" && choice !== "black") {
-                alert("Please enter 'white' or 'black'.");
-                return;
-            }
-            const requesterColor = choice === "white";
-            globals.newGameOfferPending = true;
-            globals.newGameRequestedColor = requesterColor;
-            globals.peer.send(JSON.stringify({ type: 'new_game_offer', requesterColor }));
-            newGameBtn.textContent = "Offer Sent...";
-            newGameBtn.disabled = true;
+        newGameBtn.addEventListener("click", async () => {
+        if (!globals.connected || !globals.gameOver) return;
+        const picked = await Modal.pickColor({
+            title: "New Game",
+            message: "Play as:",
+            defaultValue: "white",
+            okText: "Offer",
+            cancelText: "Cancel",
+        });
+        if (!picked) return; // canceled
+        const requesterColor = (picked === "white"); // true=white, false=black
+        globals.newGameOfferPending = true;
+        globals.newGameRequestedColor = requesterColor;
+        globals.peer.send(JSON.stringify({ type: "new_game_offer", requesterColor }));
+        newGameBtn.textContent = "Offer Sent...";
+        newGameBtn.disabled = true;
         });
     }
 }
@@ -680,19 +830,40 @@ function getFEN() {
     return `${placement} ${active} ${castling} ${ep} ${globals.halfMoveClock} ${globals.fullMoveNumber}`;
 }
 
-function downloadFen() {
-    const fen = getFEN();
-    const blob = new Blob([fen + "\n"], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "game.fen";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-        URL.revokeObjectURL(a.href);
-        a.remove();
-    }, 0);
+async function copyFen() {
+    const btn = document.getElementById("fenBtn");
+    const originalText = btn.textContent;
+    try {
+        const fen = getFEN();
+        if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(fen);
+        } else {
+        const ta = document.createElement("textarea");
+        ta.value = fen;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        const ok = document.execCommand("copy");
+        ta.remove();
+        if (!ok) throw new Error("execCommand copy failed");
+        }
+        btn.textContent = "Copied!";
+    } catch (e) {
+        btn.textContent = "Copy failed";
+        console.error(e);
+    } finally {
+        btn.disabled = true;
+        setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        }, 1000);
+    }
 }
+
 
 function enPassantCaptureIsPossible() {
     const ep = globals.enPassant;
@@ -713,10 +884,19 @@ function isEnemy(color, pieceChar) { return color !== isUpper(pieceChar); }
 function viewToBoard(viewRow, viewCol) { return globals.isWhiteView ? [viewRow, viewCol] : [7 - viewRow, 7 - viewCol]; }
 function boardToView(boardRow, boardCol) { return globals.isWhiteView ? [boardRow, boardCol] : [7 - boardRow, 7 - boardCol]; }
 
-function promoteChoice() {
-    const input = prompt("Promote to (q, r, b, n):", "q");
-    const c = (input || "q").toLowerCase();
-    return ["q", "r", "b", "n"].includes(c) ? c : "q";
+async function promoteChoice() {
+  const picked = await Modal.choice(
+    "Promote to:",
+    [
+      { label: "Queen (Q)", value: "q" },
+      { label: "Rook (R)", value: "r" },
+      { label: "Bishop (B)", value: "b" },
+      { label: "Knight (N)", value: "n" },
+    ],
+    { title: "Promotion", cancelText: "Default (Queen)", defaultValue: "q" }
+  );
+
+  return String(picked || "q").toLowerCase();
 }
 
 function handleDragStart(e, pieceType, color, r, c) {
@@ -737,14 +917,15 @@ function handleDragEnd(e) {
     e.target.classList.remove('dragging');
 }
 
-function handleDrop(e, r, c) {
+async function handleDrop(e, r, c) {
     e.preventDefault();
     if (globals.selected) {
-        tryMove(r, c);
+        await tryMove(r, c);
     }
 }
 
-// RENDERING
+// Rendering
+
 function initializeBoard() {
     const boardEl = document.getElementById("board");
     boardEl.innerHTML = "";
@@ -800,9 +981,9 @@ function createPieceImg(pieceChar, r, c) {
     return img;
 }
 
-function onPieceClick(pieceType, color, row, col) {
+async function onPieceClick(pieceType, color, row, col) {
     if (globals.selected) {
-        if (tryMove(row, col)) return;
+        if (await tryMove(row, col)) return;
     }
     if (globals.myColor !== color) return; 
     if (globals.turn !== color) return;
@@ -811,9 +992,9 @@ function onPieceClick(pieceType, color, row, col) {
     highlightMoves(moves);
 }
 
-function onSquareClick(row, col) {
+async function onSquareClick(row, col) {
     if (globals.turn !== globals.myColor) return;
-    tryMove(row, col);
+    await tryMove(row, col);
 }
 
 function highlightMoves(moves) {
@@ -849,40 +1030,43 @@ function recordRepetition() {
 }
 
 function checkGameOver() {
+  return new Promise((resolve) => {
     requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            if (globals.halfMoveClock >= 100) {
-                alert("Draw by 50-move rule!");
-                globals.gameOver = true;
-                setGameOverIndicator("Draw");
-                return;
-            }
-            if (isInsufficientMaterial()) {
-                alert("Draw by insufficient material!");
-                globals.gameOver = true;
-                setGameOverIndicator("Draw");
-                return;
-            }
-            const repCount = recordRepetition();
-            if (repCount >= 3) {
-                alert("Threefold repetition! Draw.");
-                globals.gameOver = true;
-                setGameOverIndicator("Draw");
-                return;
-            }
-            const endState = getEndStateForSideToMove();
-            if (endState === "checkmate") {
-                const winner = globals.turn ? "Black" : "White";
-                alert(`Checkmate! ${globals.turn ? "White" : "Black"} is checkmated.`);
-                globals.gameOver = true;
-                setGameOverIndicator(`${winner} Wins`);
-            } else if (endState === "stalemate") {
-                alert("Stalemate! Draw.");
-                globals.gameOver = true;
-                setGameOverIndicator("Draw");
-            }
-        });
+      requestAnimationFrame(() => {
+
+        const endWith = (message, indicator) => {
+          globals.gameOver = true;
+          setGameOverIndicator(indicator);
+          void Modal.alert(message, { title: "Game Over" });
+
+          resolve();
+        };
+        if (globals.gameOver) return resolve();
+        if (globals.halfMoveClock >= 100) {
+          return endWith("Draw by 50-move rule!", "Draw");
+        }
+        if (isInsufficientMaterial()) {
+          return endWith("Draw by insufficient material!", "Draw");
+        }
+        const repCount = recordRepetition();
+        if (repCount >= 3) {
+          return endWith("Threefold repetition! Draw.", "Draw");
+        }
+        const endState = getEndStateForSideToMove();
+        if (endState === "checkmate") {
+          const winner = globals.turn ? "Black" : "White";
+          return endWith(
+            `Checkmate! ${globals.turn ? "White" : "Black"} is checkmated.`,
+            `${winner} Wins`
+          );
+        }
+        if (endState === "stalemate") {
+          return endWith("Stalemate! Draw.", "Draw");
+        }
+        resolve();
+      });
     });
+  });
 }
 
 function isInsufficientMaterial() {

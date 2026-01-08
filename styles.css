@@ -145,11 +145,12 @@ h1 {
 #turn-indicator {
     font-size: 1.1rem;
     padding: 12px;
-    background: rgba(0,0,0,0.3);
+    background: var(--accent-green);
     border-radius: 6px;
     text-align: center;
     color: #fff;
-    border-left: 4px solid var(--accent-green);
+    font-weight: 800;
+    border-left: none;
 }
 
 .controls {
@@ -179,6 +180,48 @@ button:active { transform: translateY(0); }
 
 #drawBtn { background-color: var(--accent-blue); color: white; }
 #resignBtn { background-color: var(--accent-red); color: white; }
+
+/* --- Portrait-only: show an overlay when the phone is rotated --- */
+#rotate-overlay {
+  display: none;              /* hidden in portrait */
+  position: fixed;
+  inset: 0;
+  z-index: 9999;              /* above #connection-panel (z-index: 2000) */
+  background: #111;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+#rotate-overlay .rotate-card {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px;
+  padding: 18px 20px;
+  max-width: 320px;
+}
+
+#rotate-overlay .rotate-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+#rotate-overlay .rotate-sub {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+/* Only on phones + landscape: show overlay and hide everything else */
+@media (max-width: 900px) and (orientation: landscape) {
+  #rotate-overlay { display: flex; }
+
+  body > *:not(#rotate-overlay) {
+    display: none !important;
+  }
+}
 
 #connection-panel {
     position: fixed;
@@ -232,4 +275,162 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
 
 .piece.dragging {
     opacity: 0; 
+}
+
+.github-link {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  z-index: 1500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  background: #fff;
+  color: #000;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 8px 10px;
+  border-radius: 10px;
+
+  border: 1px solid rgba(0,0,0,0.15);
+  backdrop-filter: none;
+  transition: all 0.2s ease;
+}
+
+.github-link:hover {
+  color: #000;
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+
+.github-link:active {
+  transform: translateY(0);
+}
+
+.github-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+}
+
+.app-modal {
+  width: min(92vw, 420px);
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 0;
+  background: #1e1e1e;
+  color: #fff;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+
+.app-modal::backdrop {
+  background: rgba(0,0,0,0.72);
+}
+
+.app-modal__form {
+  padding: 18px 18px 14px;
+}
+
+.app-modal__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.app-modal__message {
+  font-size: 0.95rem;
+  opacity: 0.95;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.app-modal__input {
+  width: 100%;
+  margin-top: 12px;
+  height: 42px;
+  background: #121212;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.app-modal__choices {
+  display: none;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.app-modal__buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.app-modal__btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  text-transform: none;
+}
+
+.app-modal__btn--ghost {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Use your existing accent green */
+.app-modal__btn:not(.app-modal__btn--ghost) {
+  background: var(--accent-green);
+  color: #111;
+}
+
+/* Mobile: make control buttons more compact without affecting desktop */
+@media (max-width: 600px) {
+  .side-panel {
+    width: 92vw;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .controls {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .controls button {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    border-radius: 10px;
+    flex: 1 1 45%;
+    min-width: 140px;
+  }
+
+  .github-link {
+    top: 12px;
+    right: 12px;
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+
+  .github-icon {
+    width: 16px;
+    height: 16px;
+  }
 }
