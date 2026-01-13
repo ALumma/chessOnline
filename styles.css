@@ -1,280 +1,46 @@
 :root {
-    --bg-color: #2c2c2c;
-    --panel-bg: rgba(255, 255, 255, 0.1);
-    --text-color: #ffffff;
-    --board-light: #ebecd0;
-    --board-dark: #739552;
-    --highlight: rgba(255, 255, 51, 0.5);
-    --accent-green: #81b64c;
-    --accent-red: #d32f2f;
-    --accent-blue: #2196F3;
+  --bg-color: #2c2c2c;
+  --panel-bg: rgba(255, 255, 255, 0.1);
+  --text-color: #ffffff;
+  --board-light: #ebecd0;
+  --board-dark: #739552;
+  --highlight: rgba(255, 255, 51, 0.5);
+  --accent-green: #81b64c;
+  --accent-red: #d32f2f;
+  --accent-blue: #2196f3;
 }
 
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    overflow: hidden;
-    position: relative;
-}
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg-color);
+  color: var(--text-color);
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
 
-h1 {
-    font-weight: 300;
-    letter-spacing: 2px;
-    font-size: 2rem;
-    position: absolute;
-    top: 20px;
-    width: 100%;
-    text-align: center;
-    pointer-events: none;
-}
-
-.game-wrap {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-}
-
-#board {
-    display: grid;
-    grid-template-columns: repeat(8, 12.5%);
-    grid-template-rows: repeat(8, 12.5%);
-    width: 80vmin;
-    height: 80vmin;
-    max-width: 800px;
-    max-height: 800px;
-    border: 8px solid #444;
-    border-radius: 4px;
-    background: #333;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    z-index: 1;
-}
-
-.square {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
-.light { background-color: var(--board-light); }
-.dark { background-color: var(--board-dark); }
-
-.square.selected { background-color: var(--highlight) !important; }
-
-.square.move-dot::after {
-    content: "";
-    position: absolute;
-    width: 25%; height: 25%;
-    background: rgba(0,0,0,0.2);
-    border-radius: 50%;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-}
-.square.move-dot:has(.piece)::after {
-    width: 90%; height: 90%;
-    background: transparent;
-    border: 6px solid rgba(0,0,0,0.2);
-}
-
-.piece {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%; height: 100%;
-    cursor: grab;
-    z-index: 10;
-}
-.piece:active {
-    cursor: grabbing;
-    transform: translate(-50%, -50%) scale(1.1);
-}
-
-.side-panel {
-    position: absolute;
-    right: 40px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    width: 220px;
-    padding: 25px;
-    background: var(--panel-bg);
-    border-radius: 12px;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.05);
-    z-index: 10;
-}
-
-@media (max-width: 1200px) {
-    .game-wrap {
-        flex-direction: column;
-    }
-    .side-panel {
-        position: static;
-        transform: none;
-        margin-top: 30px;
-        width: 80vmin; /* Match board width */
-        max-width: 500px;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-    }
-    h1 {
-        position: static;
-        margin-bottom: 10px;
-    }
-}
-
-#turn-indicator {
-    font-size: 1.1rem;
-    padding: 12px;
-    background: var(--accent-green);
-    border-radius: 6px;
-    text-align: center;
-    color: #fff;
-    font-weight: 800;
-    border-left: none;
-}
-
-.controls {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-}
-
-@media (max-width: 1200px) {
-    .controls { flex-direction: row; width: auto; gap: 10px; }
-}
-
-button {
-    padding: 14px;
-    font-size: 0.95rem;
-    font-weight: 700;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-}
-
-button:hover { filter: brightness(1.15); transform: translateY(-2px); }
-button:active { transform: translateY(0); }
-
-#drawBtn { background-color: var(--accent-blue); color: white; }
-#resignBtn { background-color: var(--accent-red); color: white; }
-
-/* --- Portrait-only: show an overlay when the phone is rotated --- */
-#rotate-overlay {
-  display: none;              /* hidden in portrait */
-  position: fixed;
-  inset: 0;
-  z-index: 9999;              /* above #connection-panel (z-index: 2000) */
-  background: #111;
-  color: #fff;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+/* Header / chrome */
+h1 {
+  font-weight: 300;
+  letter-spacing: 2px;
+  font-size: 2rem;
+
+  position: absolute;
+  top: 20px;
+  width: 100%;
   text-align: center;
-  padding: 24px;
-}
-
-#rotate-overlay .rotate-card {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 16px;
-  padding: 18px 20px;
-  max-width: 320px;
-}
-
-#rotate-overlay .rotate-title {
-  font-size: 1.2rem;
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-#rotate-overlay .rotate-sub {
-  font-size: 0.95rem;
-  opacity: 0.9;
-}
-
-/* Only on phones + landscape: show overlay and hide everything else */
-@media (max-width: 900px) and (orientation: landscape) {
-  #rotate-overlay { display: flex; }
-
-  body > *:not(#rotate-overlay) {
-    display: none !important;
-  }
-}
-
-#connection-panel {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.92);
-    z-index: 2000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.connection-box {
-    background: #1e1e1e;
-    padding: 40px;
-    border-radius: 16px;
-    width: 90%;
-    max-width: 480px;
-    text-align: center;
-    border: 1px solid #333;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-}
-
-.connection-box h2 { color: var(--accent-green); margin-bottom: 20px; font-weight: 400; }
-
-.code-area { margin: 25px 0; text-align: left; }
-.code-area label { display: block; color: #888; margin-bottom: 8px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; }
-
-textarea {
-    width: 100%;
-    height: 70px;
-    background: #121212;
-    border: 1px solid #333;
-    color: var(--accent-green);
-    padding: 12px;
-    border-radius: 6px;
-    resize: none;
-    font-family: 'Consolas', monospace;
-    font-size: 0.9rem;
-}
-
-textarea:focus { outline: none; border-color: var(--accent-green); }
-
-#copyBtn, #connectBtn { width: 100%; margin-top: 10px; }
-#copyBtn { background-color: #333; color: #ccc; }
-#connectBtn { background-color: var(--accent-green); color: #111; }
-
-.piece {
-    cursor: grab;
-}
-
-.piece.dragging {
-    opacity: 0; 
+  pointer-events: none;
 }
 
 .github-link {
@@ -282,6 +48,7 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
   top: 22px;
   right: 22px;
   z-index: 1500;
+
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -294,8 +61,7 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
   padding: 8px 10px;
   border-radius: 10px;
 
-  border: 1px solid rgba(0,0,0,0.15);
-  backdrop-filter: none;
+  border: 1px solid rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
 }
 
@@ -316,24 +82,325 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
   display: block;
 }
 
-.app-modal {
-  width: min(92vw, 420px);
+/* Game layout */
+.game-wrap,
+#game-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#game-wrap {
+  position: relative;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+
+  width: 80vmin;
+  height: 80vmin;
+  aspect-ratio: 1 / 1;
+
+  max-width: 800px;
+  max-height: 800px;
+
+  border: 8px solid #444;
+  border-radius: 4px;
+  background: #333;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  z-index: 1;
+}
+
+/* Squares / pieces */
+.square {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.light {
+  background-color: var(--board-light);
+}
+
+.dark {
+  background-color: var(--board-dark);
+}
+
+.square.selected {
+  background-color: var(--highlight) !important;
+}
+
+.square.move-dot::after {
+  content: "";
+  position: absolute;
+  width: 25%;
+  height: 25%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.square.move-dot:has(.piece)::after {
+  width: 90%;
+  height: 90%;
+  background: transparent;
+  border: 6px solid rgba(0, 0, 0, 0.2);
+}
+
+.square.last-move::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 0, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+
+  cursor: grab;
+  z-index: 10;
+}
+
+.piece:active {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.piece.dragging {
+  opacity: 0;
+}
+
+/* Side panel / controls */
+.side-panel {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+
+  width: 220px;
+  padding: 25px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+
+  background: var(--panel-bg);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+#turn-indicator {
+  font-size: 1.1rem;
+  padding: 12px;
+
+  background: var(--accent-green);
+  border-radius: 6px;
+  text-align: center;
+  color: #fff;
+  font-weight: 800;
+}
+
+.controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button {
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+#drawBtn {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+#resignBtn {
+  background-color: var(--accent-red);
+  color: #fff;
+}
+
+#fsBtn {
+  background-color: #333;
+  color: #fff;
+}
+
+/* Rotate overlay */
+#rotate-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  background: #111;
+  color: #fff;
+  padding: 24px;
+
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#rotate-overlay .rotate-card {
+  max-width: 320px;
+  padding: 18px 20px;
+
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+}
+
+#rotate-overlay .rotate-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+#rotate-overlay .rotate-sub {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+/* Connection panel */
+#connection-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.connection-box {
+  width: 90%;
+  max-width: 480px;
+  padding: 40px;
+
+  background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 16px;
-  padding: 0;
-  background: #1e1e1e;
-  color: #fff;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+.connection-box h2 {
+  color: var(--accent-green);
+  margin-bottom: 20px;
+  font-weight: 400;
+}
+
+.code-area {
+  margin: 25px 0;
+  text-align: left;
+}
+
+.code-area label {
+  display: block;
+  margin-bottom: 8px;
+
+  color: #888;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+textarea {
+  width: 100%;
+  height: 70px;
+
+  background: #121212;
+  border: 1px solid #333;
+  border-radius: 6px;
+
+  color: var(--accent-green);
+  padding: 12px;
+  resize: none;
+
+  font-family: Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-green);
+}
+
+#copyBtn,
+#connectBtn {
+  width: 100%;
+  margin-top: 10px;
+}
+
+#copyBtn {
+  background-color: #333;
+  color: #ccc;
+}
+
+#connectBtn {
+  background-color: var(--accent-green);
+  color: #111;
+}
+
+/* Modal */
+.app-modal {
+  width: min(92vw, 420px);
+  max-height: 90vh;
+  overflow: auto;
+
   position: fixed;
   inset: 0;
   margin: auto;
-  max-height: 90vh;
-  overflow: auto;
+
+  background: #1e1e1e;
+  color: #fff;
+
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
 }
 
-
 .app-modal::backdrop {
-  background: rgba(0,0,0,0.72);
+  background: rgba(0, 0, 0, 0.72);
 }
 
 .app-modal__form {
@@ -355,13 +422,15 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
 
 .app-modal__input {
   width: 100%;
-  margin-top: 12px;
   height: 42px;
+  margin-top: 12px;
+
   background: #121212;
   border: 1px solid #333;
+  border-radius: 10px;
+
   color: #fff;
   padding: 10px 12px;
-  border-radius: 10px;
   font-size: 0.95rem;
 }
 
@@ -382,6 +451,7 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
 .app-modal__btn {
   padding: 10px 14px;
   border-radius: 10px;
+
   font-weight: 800;
   border: none;
   cursor: pointer;
@@ -389,18 +459,134 @@ textarea:focus { outline: none; border-color: var(--accent-green); }
 }
 
 .app-modal__btn--ghost {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Use your existing accent green */
 .app-modal__btn:not(.app-modal__btn--ghost) {
   background: var(--accent-green);
   color: #111;
 }
 
-/* Mobile: make control buttons more compact without affecting desktop */
+/* Fullscreen */
+#game-wrap:fullscreen {
+  width: 100vw;
+  height: 100vh;
+
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-wrap:fullscreen #board {
+  width: min(100vw, 100vh) !important;
+  height: min(100vw, 100vh) !important;
+  max-width: none;
+  max-height: none;
+
+  border-radius: 0;
+  border-width: 0;
+  box-shadow: none;
+}
+
+#game-wrap:fullscreen .side-panel {
+  display: none !important;
+}
+
+#game-wrap.pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-wrap.pseudo-fullscreen #board {
+  width: min(100vw, 100vh);
+  height: min(100vw, 100vh);
+  max-width: none;
+  max-height: none;
+
+  border-radius: 0;
+  border-width: 0;
+  box-shadow: none;
+}
+
+#game-wrap.pseudo-fullscreen .side-panel {
+  display: none !important;
+}
+
+#fsExitBtn {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 4000;
+
+  padding: 10px 12px;
+  border: 1px solid #444;
+  border-radius: 10px;
+
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+}
+
+#fsExitBtn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+#game-wrap:fullscreen #fsExitBtn,
+#game-wrap.pseudo-fullscreen #fsExitBtn {
+  display: block;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .game-wrap {
+    flex-direction: column;
+  }
+
+  .side-panel {
+    position: static;
+    transform: none;
+    margin-top: 30px;
+
+    width: 80vmin;
+    max-width: 500px;
+
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .controls {
+    flex-direction: row;
+    width: auto;
+    gap: 10px;
+  }
+
+  h1 {
+    position: static;
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  #rotate-overlay {
+    display: flex;
+  }
+
+  body > *:not(#rotate-overlay) {
+    display: none !important;
+  }
+}
+
 @media (max-width: 600px) {
   .side-panel {
     width: 92vw;

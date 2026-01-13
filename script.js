@@ -13,6 +13,7 @@ const globals = {
     gameOver: false,
     newGameOfferPending: false,
     newGameRequestedColor: null,
+    lastMove: null,
     // Network
     isHost: false,
     myColor: true,
@@ -633,6 +634,7 @@ async function tryMove(toRow, toCol, remoteMove = null) {
     }
     globals.boardState[toRow][toCol] = placed;
     globals.boardState[fr][fc] = null;
+    globals.lastMove = { from: [fr, fc], to: [toRow, toCol] };
     const movingWasWhite = globals.turn;
     globals.turn = !globals.turn;
     if (!movingWasWhite) globals.fullMoveNumber++;
@@ -704,6 +706,60 @@ function setupUI() {
             copyFen();
         });
     }
+    const fsBtn = document.getElementById("fsBtn");
+    const gameWrapEl = document.getElementById("game-wrap");
+
+    function setFsButtonLabel() {
+    const isNativeFs = !!document.fullscreenElement;
+    const isPseudoFs = gameWrapEl?.classList.contains("pseudo-fullscreen");
+    if (fsBtn) fsBtn.textContent = (isNativeFs || isPseudoFs) ? "Exit Full Screen" : "Full Screen";
+    }
+
+    async function enterFullscreen() {
+    // Fullscreen the WRAPPER so it can be black + center the square board
+    if (gameWrapEl && gameWrapEl.requestFullscreen && document.fullscreenEnabled) {
+        await gameWrapEl.requestFullscreen();
+        return;
+    }
+    // Fallback
+    if (gameWrapEl) gameWrapEl.classList.add("pseudo-fullscreen");
+    }
+
+    async function exitFullscreen() {
+    if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+        return;
+    }
+    if (gameWrapEl) gameWrapEl.classList.remove("pseudo-fullscreen");
+    }
+
+    async function toggleFullscreen() {
+    const isNativeFs = !!document.fullscreenElement;
+    const isPseudoFs = gameWrapEl?.classList.contains("pseudo-fullscreen");
+    if (isNativeFs || isPseudoFs) await exitFullscreen();
+    else await enterFullscreen();
+    setFsButtonLabel();
+    }
+
+    if (fsBtn) {
+    fsBtn.addEventListener("click", () => toggleFullscreen().catch(console.error));
+    }
+
+    document.addEventListener("fullscreenchange", setFsButtonLabel);
+    document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && gameWrapEl?.classList.contains("pseudo-fullscreen")) {
+        gameWrapEl.classList.remove("pseudo-fullscreen");
+        setFsButtonLabel();
+    }
+    });
+
+    setFsButtonLabel();
+    const fsExitBtn = document.getElementById("fsExitBtn");
+    if (fsExitBtn) {
+        fsExitBtn.addEventListener("click", () => {
+            exitFullscreen().catch(console.error);
+        });
+    }
     const newGameBtn = document.getElementById("newGameBtn");
     if (newGameBtn) {
         newGameBtn.addEventListener("click", async () => {
@@ -747,6 +803,7 @@ function resetGameState() {
     globals.gameOver = false;
     globals.newGameOfferPending = false;
     globals.newGameRequestedColor = null;
+    globals.lastMove = null;
     recordRepetition();
 }
 
@@ -946,6 +1003,7 @@ function initializeBoard() {
             boardEl.appendChild(square);
         }
     }
+    applyLastMoveHighlight();
 }
 
 function drawBoard() {
@@ -963,6 +1021,7 @@ function drawBoard() {
             }
         }
     }
+    applyLastMoveHighlight();
 }
 
 function createPieceImg(pieceChar, r, c) {
@@ -1011,6 +1070,30 @@ function highlightMoves(moves) {
         const index = (vr * globals.boardLength) + vc;
         squares[index].classList.add("move-dot");
     }
+}
+
+function clearLastMoveHighlight() {
+  const squares = document.getElementsByClassName("square");
+  for (let i = 0; i < squares.length; i++) {
+    squares[i].classList.remove("last-move");
+  }
+}
+
+function applyLastMoveHighlight() {
+  clearLastMoveHighlight();
+  if (!globals.lastMove) return;
+
+  const squares = document.getElementsByClassName("square");
+
+  const add = (r, c) => {
+    const [vr, vc] = boardToView(r, c);
+    const idx = (vr * globals.boardLength) + vc;
+    const el = squares[idx];
+    if (el) el.classList.add("last-move");
+  };
+
+  add(globals.lastMove.from[0], globals.lastMove.from[1]);
+  add(globals.lastMove.to[0], globals.lastMove.to[1]);
 }
 
 function clearHighlights() {
